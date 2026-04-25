@@ -1,8 +1,8 @@
-# ConceptPilot
+# ConceptMate
 
 Adaptive learning assistant for the official PromptWars 2026 submission.
 
-ConceptPilot diagnoses a learner's current understanding, creates a concept map, teaches one concept at a time, checks mastery, and explains why the next learning step changed.
+ConceptMate diagnoses a learner's current understanding, creates a concept map, teaches one concept at a time, checks mastery, and explains why the next learning step changed.
 
 ## Flow
 
@@ -56,7 +56,7 @@ npm run dev
 
 Open `http://localhost:3000`.
 
-Optional Firebase web config enables Google Sign-In. Guest sessions work without Firebase.
+Optional Firebase web config enables Google Sign-In. Guest sessions work without Firebase. For real Google login, set the frontend `NEXT_PUBLIC_FIREBASE_*` values and backend `FIREBASE_PROJECT_ID`, then restart both dev servers.
 
 ## Tests
 
@@ -113,4 +113,3 @@ gcloud run deploy conceptpilot-ui \
 ```
 
 Add Firebase public web config as `NEXT_PUBLIC_FIREBASE_*` env vars if Google Sign-In is enabled.
-

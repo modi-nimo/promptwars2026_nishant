@@ -54,7 +54,7 @@ export function useFirebaseUser() {
   async function signIn() {
     const firebaseApp = app();
     if (!firebaseApp) {
-      return null;
+      throw new Error("Firebase web config is missing");
     }
     const result = await signInWithPopup(getAuth(firebaseApp), new GoogleAuthProvider());
     setUser(result.user);
@@ -76,4 +76,3 @@ export function useFirebaseUser() {
 
   return { enabled, user, loading, signIn, signOutUser, token };
 }
-

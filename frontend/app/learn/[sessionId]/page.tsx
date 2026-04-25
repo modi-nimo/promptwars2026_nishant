@@ -2,15 +2,16 @@
 
 import {
   ArrowLeft,
+  Bot,
   Brain,
   CheckCircle2,
   ChevronRight,
-  Gauge,
-  HelpCircle,
+  Clock3,
+  LayoutDashboard,
   Loader2,
   MessageCircle,
-  Target,
-  XCircle
+  Sparkles,
+  Zap,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -32,13 +33,6 @@ function percent(value: number) {
   return `${Math.round(value * 100)}%`;
 }
 
-function actionLabel(action: string) {
-  return action
-    .split("_")
-    .map((part) => part[0].toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
 export default function LearnSessionPage() {
   const params = useParams<{ sessionId: string }>();
   const sessionId = params.sessionId;
@@ -49,7 +43,7 @@ export default function LearnSessionPage() {
   const [confidences, setConfidences] = useState<Record<string, number>>({});
   const [checkOption, setCheckOption] = useState("");
   const [checkConfidence, setCheckConfidence] = useState(3);
-  const [coachMessage, setCoachMessage] = useState("I am confused. Give me a simpler example.");
+  const [coachMessage, setCoachMessage] = useState("Explain this concept using a real-world analogy.");
   const [lastCheck, setLastCheck] = useState<CheckSubmitResponse | null>(null);
   const [lastCoach, setLastCoach] = useState<CoachResponse | null>(null);
   const [status, setStatus] = useState<string | null>(null);
@@ -61,11 +55,8 @@ export default function LearnSessionPage() {
 
   useEffect(() => {
     let cancelled = false;
-
     async function loadSession() {
-      if (auth.loading) {
-        return;
-      }
+      if (auth.loading) return;
       setLoading(true);
       setError(null);
       try {
@@ -76,436 +67,341 @@ export default function LearnSessionPage() {
           setCheckOption("");
         }
       } catch (requestError) {
-        if (!cancelled) {
-          setError(requestError instanceof Error ? requestError.message : "Could not load session");
-        }
+        if (!cancelled) setError(requestError instanceof Error ? requestError.message : "Could not load session");
       } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       }
     }
-
     loadSession();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [auth.loading, sessionId]);
 
   const diagnosticComplete = Boolean(session?.learner_model && session.current_card);
   const answeredDiagnostics = useMemo(() => Object.keys(answers).length, [answers]);
 
   async function runDiagnostic() {
-    if (!session) {
+    if (!session || answeredDiagnostics !== session.diagnostic_questions.length) {
+      setError("Please answer all diagnostic questions.");
       return;
     }
-    if (answeredDiagnostics !== session.diagnostic_questions.length) {
-      setError("Answer each diagnostic question before continuing.");
-      return;
-    }
-
     setSubmittingDiagnostic(true);
     setError(null);
-    setStatus(null);
     try {
       const token = await auth.token();
-      const result: DiagnosticSubmitResponse = await submitDiagnostic(
-        {
-          session_id: session.session_id,
-          answers: session.diagnostic_questions.map((question) => ({
-            question_id: question.id,
-            selected_option: answers[question.id],
-            confidence: confidences[question.id] ?? 3
-          }))
-        },
-        token
-      );
-      setSession({
-        ...session,
-        learner_model: result.learner_model,
-        concept_map: result.concept_map,
-        current_card: result.next_card
-      });
-      setStatus(`Diagnostic complete. Pace set to ${result.learner_model.pace}.`);
-      setLastCheck(null);
-      setLastCoach(null);
-      setCheckOption("");
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Diagnostic failed");
-    } finally {
-      setSubmittingDiagnostic(false);
-    }
+      const result: DiagnosticSubmitResponse = await submitDiagnostic({
+        session_id: session.session_id,
+        answers: session.diagnostic_questions.map((q) => ({
+          question_id: q.id,
+          selected_option: answers[q.id],
+          confidence: confidences[q.id] ?? 3
+        }))
+      }, token);
+      setSession({ ...session, learner_model: result.learner_model, concept_map: result.concept_map, current_card: result.next_card });
+      setStatus("Diagnostic calibrated. Adaptive path initialized.");
+    } catch (e) { setError(e instanceof Error ? e.message : "Diagnostic failed"); }
+    finally { setSubmittingDiagnostic(false); }
   }
 
   async function runCheck() {
-    if (!session?.current_card || !checkOption) {
-      setError("Choose an answer for the current check.");
-      return;
-    }
-
+    if (!session?.current_card || !checkOption) return;
     setSubmittingCheck(true);
     setError(null);
-    setStatus(null);
     try {
       const token = await auth.token();
-      const result = await submitCheck(
-        {
-          session_id: session.session_id,
-          card_id: session.current_card.id,
-          question_id: session.current_card.check_question.id,
-          selected_option: checkOption,
-          confidence: checkConfidence
-        },
-        token
-      );
-      setSession({
-        ...session,
-        learner_model: result.learner_model,
-        concept_map: result.concept_map,
-        current_card: result.next_card
-      });
+      const result = await submitCheck({
+        session_id: session.session_id,
+        card_id: session.current_card.id,
+        question_id: session.current_card.check_question.id,
+        selected_option: checkOption,
+        confidence: checkConfidence
+      }, token);
+      setSession({ ...session, learner_model: result.learner_model, concept_map: result.concept_map, current_card: result.next_card });
       setLastCheck(result);
-      setLastCoach(null);
-      setStatus(result.feedback);
       setCheckOption("");
-      setCheckConfidence(3);
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Check failed");
-    } finally {
-      setSubmittingCheck(false);
-    }
+    } catch (e) { setError(e instanceof Error ? e.message : "Check failed"); }
+    finally { setSubmittingCheck(false); }
   }
 
   async function requestCoach() {
-    if (!session) {
-      return;
-    }
-
+    if (!session) return;
     setCoachLoading(true);
     setError(null);
-    setStatus(null);
     try {
       const token = await auth.token();
-      const result = await askCoach(
-        {
-          session_id: session.session_id,
-          message: coachMessage
-        },
-        token
-      );
+      const result = await askCoach({ session_id: session.session_id, message: coachMessage }, token);
       setLastCoach(result);
-      setLastCheck(null);
-      setStatus(result.coach_response);
       setSession({
         ...session,
-        learner_model: session.learner_model
-          ? {
-              ...session.learner_model,
-              weak_topics: result.updated_weak_topics
-            }
-          : session.learner_model,
+        learner_model: session.learner_model ? { ...session.learner_model, weak_topics: result.updated_weak_topics } : session.learner_model,
         current_card: result.next_card ?? session.current_card
       });
-      setCheckOption("");
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Coach failed");
-    } finally {
-      setCoachLoading(false);
-    }
+    } catch (e) { setError(e instanceof Error ? e.message : "Coach failed"); }
+    finally { setCoachLoading(false); }
   }
 
-  if (loading || auth.loading) {
-    return (
-      <main className="app-shell centered-state">
-        <Loader2 className="spin" size={28} aria-hidden="true" />
-        <p>Loading session</p>
-      </main>
-    );
-  }
+  if (loading || auth.loading) return (
+    <main className="learn-shell centered-state" style={{ height: '100vh' }}>
+      <Loader2 className="spin text-cyan" size={48} />
+      <h2 className="text-cyan">Calibrating Session...</h2>
+    </main>
+  );
 
-  if (!session) {
-    return (
-      <main className="app-shell centered-state">
-        <p className="error-text" role="alert">
-          {error || "Session unavailable"}
-        </p>
-        <Link className="icon-text-button" href="/">
-          <ArrowLeft size={18} aria-hidden="true" />
-          New session
+  if (!session) return (
+    <main className="learn-shell centered-state" style={{ height: '100vh' }}>
+      <div className="glass-panel text-center">
+        <h2 className="text-error">Session Lost</h2>
+        <p>{error || "We couldn't find your session data."}</p>
+        <Link href="/" className="btn-primary" style={{ display: 'inline-flex', marginTop: '1rem' }}>
+          <ArrowLeft size={18} /> New Mission
         </Link>
-      </main>
-    );
-  }
+      </div>
+    </main>
+  );
 
   return (
-    <main className="app-shell learning-shell">
-      <a className="skip-link" href="#learning-workspace">
-        Skip to workspace
-      </a>
+    <main className="learn-shell">
+      <div className="learn-type-background" aria-hidden="true">
+        <span>LEARN</span>
+        <span>ADAPT</span>
+        <span>MASTER</span>
+      </div>
 
-      <header className="learning-header">
-        <Link className="icon-button" href="/" aria-label="Start a new session">
-          <ArrowLeft size={20} aria-hidden="true" />
-        </Link>
-        <div>
-          <p className="eyebrow">{session.auth_mode === "google" ? "Google saved" : "Guest session"}</p>
-          <h1>{session.goal}</h1>
-        </div>
-        <div className="provider-pill">
-          <Brain size={16} aria-hidden="true" />
-          {session.ai.provider}
+      {/* Header */}
+      <header className="learn-topbar">
+        <div className="learn-topbar-inner">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <Link href="/" className="btn-secondary learn-back-button" aria-label="Back to setup">
+              <ArrowLeft size={18} />
+            </Link>
+            <div>
+              <p className="eyebrow" style={{ margin: 0, fontSize: '0.6rem' }}>Current Mission</p>
+              <h3 style={{ margin: 0, fontSize: '1.1rem' }} className="text-cyan">{session.goal}</h3>
+            </div>
+          </div>
+          
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <div className={`btn-secondary learn-pill`} style={{ borderColor: session.ai.provider === 'gemini' ? 'var(--zenith-success)' : 'var(--zenith-warning)' }}>
+              <Brain size={16} className={session.ai.provider === 'gemini' ? 'text-success' : 'text-warning'} />
+              <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{session.ai.provider === 'gemini' ? "Gemini Live" : "Fallback Active"}</span>
+            </div>
+            {auth.user && <div className="btn-secondary learn-pill">{auth.user.displayName || "User"}</div>}
+          </div>
         </div>
       </header>
 
-      {error ? (
-        <p className="error-text" role="alert">
-          {error}
-        </p>
-      ) : null}
-      {status ? (
-        <p className="status-text" aria-live="polite">
-          {status}
-        </p>
-      ) : null}
+      <div className="learning-layout">
+        {/* Sidebar Left: Progress & Map */}
+        <aside className="glass-panel learn-sidebar" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', overflowY: 'auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <LayoutDashboard size={20} className="text-cyan" />
+            <h3 style={{ margin: 0 }}>Mission Status</h3>
+          </div>
 
-      <section className="learning-grid" id="learning-workspace">
-        {!diagnosticComplete ? (
-          <section className="workspace-panel diagnostic-panel" aria-labelledby="diagnostic-title">
-            <div className="panel-heading">
-              <div>
-                <p className="eyebrow">Step 1</p>
-                <h2 id="diagnostic-title">Diagnostic check</h2>
-              </div>
-              <span className="count-pill">
-                {answeredDiagnostics}/{session.diagnostic_questions.length}
-              </span>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="glass-panel learn-metric" style={{ padding: '1rem', textAlign: 'center' }}>
+              <p className="eyebrow">Mastery</p>
+              <h2 className="text-cyan">{percent(session.learner_model?.mastery_score ?? 0)}</h2>
             </div>
+            <div className="glass-panel learn-metric" style={{ padding: '1rem', textAlign: 'center' }}>
+              <p className="eyebrow">Pace</p>
+              <h2 className="text-accent">{session.learner_model?.pace ?? "N/A"}</h2>
+            </div>
+          </div>
 
-            <div className="question-list">
-              {session.diagnostic_questions.map((question, index) => (
-                <fieldset className="question-block" key={question.id}>
-                  <legend>
-                    {index + 1}. {question.prompt}
-                  </legend>
-                  <div className="option-grid">
-                    {question.options.map((option) => (
-                      <button
-                        aria-pressed={answers[question.id] === option}
-                        className={answers[question.id] === option ? "option selected" : "option"}
-                        key={option}
-                        onClick={() => setAnswers((current) => ({ ...current, [question.id]: option }))}
-                        type="button"
-                      >
-                        {option}
-                      </button>
-                    ))}
+          <div>
+            <h3 className="eyebrow" style={{ marginBottom: '1rem' }}>Concept Map</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {session.concept_map.map((c) => (
+                <div key={c.id} className={`concept-node ${c.status} ${session.current_card?.title === c.title ? 'active' : ''}`}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{c.title}</span>
+                    {c.status === 'mastered' && <CheckCircle2 size={14} className="text-success" />}
                   </div>
-                  <label className="range-label">
-                    Confidence
-                    <input
-                      max={5}
-                      min={1}
-                      onChange={(event) =>
-                        setConfidences((current) => ({
-                          ...current,
-                          [question.id]: Number(event.target.value)
-                        }))
-                      }
-                      type="range"
-                      value={confidences[question.id] ?? 3}
-                    />
-                    <span>{confidences[question.id] ?? 3}/5</span>
-                  </label>
-                </fieldset>
+                  <div style={{ height: '4px', background: 'var(--zenith-accent-soft)', borderRadius: '2px', marginTop: '0.5rem' }}>
+                    <div style={{ height: '100%', width: percent(c.mastery), background: 'var(--zenith-accent)', borderRadius: '2px' }} />
+                  </div>
+                </div>
               ))}
             </div>
+          </div>
+        </aside>
 
-            <button className="primary-button" disabled={submittingDiagnostic} onClick={runDiagnostic} type="button">
-              {submittingDiagnostic ? (
-                <Loader2 size={18} className="spin" aria-hidden="true" />
-              ) : (
-                <ChevronRight size={18} aria-hidden="true" />
-              )}
-              Build adaptive path
-            </button>
-          </section>
-        ) : (
-          <>
-            <aside className="workspace-panel dashboard-panel" aria-label="Learning progress">
-              <div className="metric-row">
-                <div className="metric">
-                  <Gauge size={18} aria-hidden="true" />
-                  <span>Mastery</span>
-                  <strong>{percent(session.learner_model?.mastery_score ?? 0)}</strong>
+        {/* Main Stage */}
+        <section className="stage-main">
+          {!diagnosticComplete ? (
+            <div className="step-card">
+              <div className="glass-panel">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                  <h2 className="text-cyan">Diagnostic Calibration</h2>
+                  <span className="btn-secondary">{answeredDiagnostics}/{session.diagnostic_questions.length}</span>
                 </div>
-                <div className="metric">
-                  <Target size={18} aria-hidden="true" />
-                  <span>Pace</span>
-                  <strong>{session.learner_model?.pace}</strong>
-                </div>
-              </div>
-
-              <h2>Concept map</h2>
-              <ol className="concept-list">
-                {session.concept_map.map((concept) => (
-                  <li className={`concept-item ${concept.status}`} key={concept.id}>
-                    <div>
-                      <span>{concept.title}</span>
-                      <small>{concept.status.replace("_", " ")}</small>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                  {session.diagnostic_questions.map((q, i) => (
+                    <div key={q.id} className="glass-panel question-card">
+                      <p className="heading-font question-prompt">{i + 1}. {q.prompt}</p>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        {q.options.map((opt) => (
+                          <button
+                            key={opt}
+                            className={`${answers[q.id] === opt ? "btn-primary" : "btn-secondary"} answer-option`}
+                            onClick={() => setAnswers({ ...answers, [q.id]: opt })}
+                            style={{ textAlign: 'left' }}
+                          >
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                      <div style={{ marginTop: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <span className="eyebrow" style={{ margin: 0 }}>Confidence:</span>
+                        <input
+                          type="range"
+                          min={1} max={5}
+                          value={confidences[q.id] ?? 3}
+                          onChange={(e) => setConfidences({ ...confidences, [q.id]: Number(e.target.value) })}
+                          style={{ flex: 1 }}
+                        />
+                        <span className="text-cyan">{confidences[q.id] ?? 3}/5</span>
+                      </div>
                     </div>
-                    <meter min={0} max={1} value={concept.mastery}>
-                      {percent(concept.mastery)}
-                    </meter>
-                  </li>
-                ))}
-              </ol>
-
-              <div className="topic-stack">
-                <h3>Weak topics</h3>
-                <p>
-                  {session.learner_model?.weak_topics.length
-                    ? session.learner_model.weak_topics.join(", ")
-                    : "None marked"}
-                </p>
-              </div>
-
-              <div className="topic-stack">
-                <h3>Mastered topics</h3>
-                <p>
-                  {session.learner_model?.mastered_topics.length
-                    ? session.learner_model.mastered_topics.join(", ")
-                    : "In progress"}
-                </p>
-              </div>
-            </aside>
-
-            {session.current_card ? (
-              <section className="workspace-panel lesson-panel" aria-labelledby="lesson-title">
-                <div className="panel-heading">
-                  <div>
-                    <p className="eyebrow">{actionLabel(session.current_card.adaptive_action)}</p>
-                    <h2 id="lesson-title">{session.current_card.title}</h2>
-                  </div>
-                  <span className="count-pill">{session.current_card.estimated_minutes} min</span>
-                </div>
-
-                <p className="objective">{session.current_card.objective}</p>
-                <ul className="explanation-list">
-                  {session.current_card.explanation.map((line) => (
-                    <li key={line}>{line}</li>
                   ))}
-                </ul>
+                </div>
 
-                <section className="example-section" aria-label="Example">
-                  <h3>{session.current_card.example.title}</h3>
-                  <p>{session.current_card.example.setup}</p>
-                  <ol>
-                    {session.current_card.example.walkthrough.map((step) => (
-                      <li key={step}>{step}</li>
-                    ))}
-                  </ol>
-                  {session.current_card.example.code_sample ? (
-                    <pre>
-                      <code>{session.current_card.example.code_sample}</code>
-                    </pre>
-                  ) : null}
-                  <p className="takeaway">{session.current_card.example.takeaway}</p>
-                </section>
-
-                <section className="check-section" aria-labelledby="check-title">
-                  <h3 id="check-title">{session.current_card.check_question.prompt}</h3>
-                  <div className="option-grid">
-                    {session.current_card.check_question.options.map((option) => (
-                      <button
-                        aria-pressed={checkOption === option}
-                        className={checkOption === option ? "option selected" : "option"}
-                        key={option}
-                        onClick={() => setCheckOption(option)}
-                        type="button"
-                      >
-                        {option}
-                      </button>
-                    ))}
+                <button className="btn-primary" onClick={runDiagnostic} disabled={submittingDiagnostic} style={{ marginTop: '2rem', width: '100%' }}>
+                  {submittingDiagnostic ? <Loader2 className="spin" /> : <Zap size={18} />}
+                  <span style={{ marginLeft: '8px' }}>Analyze My Skills</span>
+                </button>
+              </div>
+            </div>
+          ) : session.current_card ? (
+            <div className="stage-card">
+              {/* Insight Toast for Adaptive Logic */}
+              {(lastCheck || lastCoach) && (
+                <div className="glass-panel fade-in learn-insight" style={{ marginBottom: '1.5rem' }}>
+                  <div style={{ display: 'flex', gap: '1rem' }}>
+                    <Sparkles className="text-accent" />
+                    <div>
+                      <p className="eyebrow" style={{ color: 'var(--zenith-accent)' }}>Coach Insight</p>
+                      <p style={{ color: 'var(--zenith-text)', margin: 0, fontWeight: 500 }}>
+                        {lastCheck ? lastCheck.adaptive_reason : lastCoach?.coach_response}
+                      </p>
+                      {lastCheck && <p style={{ fontSize: '0.8rem', marginTop: '0.5rem' }}>Mastery Change: <span className="text-accent">+{lastCheck.mastery_delta}</span></p>}
+                    </div>
                   </div>
-                  <label className="range-label">
-                    Confidence
-                    <input
-                      max={5}
-                      min={1}
-                      onChange={(event) => setCheckConfidence(Number(event.target.value))}
-                      type="range"
-                      value={checkConfidence}
-                    />
-                    <span>{checkConfidence}/5</span>
-                  </label>
-                  <button className="primary-button" disabled={submittingCheck} onClick={runCheck} type="button">
-                    {submittingCheck ? (
-                      <Loader2 size={18} className="spin" aria-hidden="true" />
-                    ) : (
-                      <CheckCircle2 size={18} aria-hidden="true" />
-                    )}
-                    Submit check
-                  </button>
-                </section>
-              </section>
-            ) : null}
-
-            <aside className="workspace-panel evidence-panel" aria-label="Adaptive evidence">
-              <h2>Why this changed</h2>
-              {lastCheck ? (
-                <div className="evidence-body">
-                  <p className={lastCheck.correctness === "correct" ? "result correct" : "result incorrect"}>
-                    {lastCheck.correctness === "correct" ? (
-                      <CheckCircle2 size={18} aria-hidden="true" />
-                    ) : (
-                      <XCircle size={18} aria-hidden="true" />
-                    )}
-                    {lastCheck.feedback}
-                  </p>
-                  <p>{lastCheck.adaptive_reason}</p>
-                  <p>
-                    Mastery delta: <strong>{lastCheck.mastery_delta > 0 ? "+" : ""}{lastCheck.mastery_delta}</strong>
-                  </p>
-                </div>
-              ) : lastCoach ? (
-                <div className="evidence-body">
-                  <p>{lastCoach.coach_response}</p>
-                  <p>
-                    Suggested action: <strong>{actionLabel(lastCoach.suggested_action)}</strong>
-                  </p>
-                </div>
-              ) : (
-                <div className="evidence-body">
-                  <p>Diagnostic pace: {session.learner_model?.pace}</p>
-                  <p>Current action: {actionLabel(session.current_card?.adaptive_action ?? "next_concept")}</p>
                 </div>
               )}
 
-              <section className="coach-section" aria-labelledby="coach-title">
-                <h3 id="coach-title">
-                  <MessageCircle size={18} aria-hidden="true" />
-                  Coach
-                </h3>
-                <textarea
-                  aria-label="Coach message"
-                  onChange={(event) => setCoachMessage(event.target.value)}
-                  rows={4}
-                  value={coachMessage}
-                />
-                <button className="icon-text-button" disabled={coachLoading} onClick={requestCoach} type="button">
-                  {coachLoading ? (
-                    <Loader2 size={18} className="spin" aria-hidden="true" />
-                  ) : (
-                    <HelpCircle size={18} aria-hidden="true" />
-                  )}
-                  Ask coach
-                </button>
-              </section>
-            </aside>
-          </>
-        )}
-      </section>
+              <div className="glass-panel">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                  <div>
+                    <span className="text-accent eyebrow">{session.current_card.adaptive_action.replace('_', ' ')}</span>
+                    <h1 style={{ fontSize: '2.5rem', margin: '0.5rem 0' }}>{session.current_card.title}</h1>
+                  </div>
+                  <div className="btn-secondary">
+                    <Clock3 size={16} className="text-cyan" />
+                    <span style={{ marginLeft: '8px' }}>{session.current_card.estimated_minutes} min</span>
+                  </div>
+                </div>
+
+                <p className="lesson-objective">{session.current_card.objective}</p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  <div className="glass-panel learning-subpanel">
+                    <h3 className="text-cyan" style={{ marginBottom: '1rem' }}>The Concept</h3>
+                    <ul style={{ paddingLeft: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                      {session.current_card.explanation.map((e, i) => <li key={i} style={{ color: 'var(--zenith-text-muted)' }}>{e}</li>)}
+                    </ul>
+                  </div>
+
+                  <div className="glass-panel learning-subpanel">
+                    <h3 className="text-accent" style={{ marginBottom: '1rem' }}>Deep Dive: {session.current_card.example.title}</h3>
+                    <p style={{ marginBottom: '1rem' }}>{session.current_card.example.setup}</p>
+                    {session.current_card.example.code_sample && (
+                      <div className="code-block" style={{ margin: '1rem 0' }}>
+                        <pre><code>{session.current_card.example.code_sample}</code></pre>
+                      </div>
+                    )}
+                    <div style={{ marginTop: '1rem', padding: '1rem', background: 'var(--zenith-accent-soft)', borderRadius: '12px', borderLeft: '4px solid var(--zenith-accent)' }}>
+                      <p style={{ margin: 0, fontStyle: 'italic', color: 'var(--zenith-text)' }}>Takeaway: {session.current_card.example.takeaway}</p>
+                    </div>
+                  </div>
+
+                  {/* Knowledge Check */}
+                  <div className="glass-panel mastery-panel">
+                    <h3 className="text-accent" style={{ marginBottom: '1.5rem' }}>Mastery Check</h3>
+                    <p style={{ fontSize: '1.1rem', marginBottom: '1.5rem', color: 'var(--zenith-text)', fontWeight: 500 }}>{session.current_card.check_question.prompt}</p>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                      {session.current_card.check_question.options.map((opt) => (
+                        <button
+                          key={opt}
+                          className={`${checkOption === opt ? "btn-primary" : "btn-secondary"} answer-option`}
+                          onClick={() => setCheckOption(opt)}
+                          style={{ textAlign: 'left' }}
+                        >
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1, maxWidth: '400px' }}>
+                        <span className="eyebrow" style={{ margin: 0 }}>Confidence:</span>
+                        <input
+                          type="range"
+                          min={1} max={5}
+                          value={checkConfidence}
+                          onChange={(e) => setCheckConfidence(Number(e.target.value))}
+                          style={{ flex: 1 }}
+                        />
+                        <span className="text-cyan">{checkConfidence}/5</span>
+                      </div>
+                      <button className="btn-primary" onClick={runCheck} disabled={submittingCheck || !checkOption}>
+                        {submittingCheck ? <Loader2 className="spin" /> : <ChevronRight size={18} />}
+                        <span style={{ marginLeft: '8px' }}>Continue Mission</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </section>
+
+        {/* Sidebar Right: AI Coach */}
+        <aside className="glass-panel learn-coach" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Bot size={20} className="text-accent" />
+            <h3 style={{ margin: 0 }}>AI Sidekick</h3>
+          </div>
+
+          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div className="glass-panel" style={{ background: 'var(--zenith-bg)', padding: '1rem', fontSize: '0.9rem', border: '1px solid var(--zenith-border)' }}>
+              <p style={{ margin: 0, color: 'var(--zenith-text)', fontWeight: 500 }}>Hello! I'm your adaptive coach. Ask me to simplify, give more examples, or explain the "why" behind any concept.</p>
+            </div>
+            
+            {lastCoach && (
+              <div className="glass-panel fade-in" style={{ background: 'var(--zenith-accent-soft)', padding: '1rem', fontSize: '0.9rem', borderLeft: '3px solid var(--zenith-accent)' }}>
+                <p style={{ margin: 0, color: 'var(--zenith-text)' }}>{lastCoach.coach_response}</p>
+              </div>
+            )}
+          </div>
+
+          <div style={{ marginTop: 'auto' }}>
+            <textarea
+              value={coachMessage}
+              onChange={(e) => setCoachMessage(e.target.value)}
+              placeholder="Ask the coach..."
+              rows={3}
+              style={{ fontSize: '0.9rem', marginBottom: '1rem' }}
+            />
+            <button className="btn-primary" style={{ width: '100%' }} onClick={requestCoach} disabled={coachLoading}>
+              {coachLoading ? <Loader2 className="spin" /> : <MessageCircle size={18} />}
+              <span style={{ marginLeft: '8px' }}>Send Request</span>
+            </button>
+          </div>
+        </aside>
+      </div>
     </main>
   );
 }
-

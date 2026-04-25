@@ -1,2 +1,1 @@
-"""ConceptPilot adaptive learning assistant backend."""
-
+"""ConceptMate adaptive learning assistant backend."""

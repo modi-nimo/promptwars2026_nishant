@@ -1,6 +1,6 @@
 # Evaluation Alignment
 
-ConceptPilot is aligned to the hackathon criteria in `Hackathon_Guidelines.MD`.
+ConceptMate is aligned to the hackathon criteria in `Hackathon_Guidelines.MD`.
 
 ## Code Quality
 
@@ -46,4 +46,3 @@ ConceptPilot is aligned to the hackathon criteria in `Hackathon_Guidelines.MD`.
 - Cloud Run deployment is documented for backend and frontend.
 - Secret Manager stores `GEMINI_API_KEY`.
 - Cloud Logging can be enabled with `ENABLE_CLOUD_LOGGING=true`.
-

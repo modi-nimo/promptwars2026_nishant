@@ -76,7 +76,7 @@ def create_app() -> FastAPI:
     configure_logging()
     settings = get_settings()
     app = FastAPI(
-        title="ConceptPilot API",
+        title="ConceptMate API",
         description="Adaptive learning assistant backend for the official PromptWars submission.",
         version="1.0.0",
     )

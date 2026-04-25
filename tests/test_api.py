@@ -90,7 +90,7 @@ def test_check_answer_updates_mastery_and_explains_adaptation(monkeypatch) -> No
     payload = response.json()
     assert payload["correctness"] == "correct"
     assert payload["mastery_delta"] > 0
-    assert "ConceptPilot" in payload["adaptive_reason"]
+    assert "ConceptMate" in payload["adaptive_reason"]
     assert payload["learner_model"]["mastery_score"] >= diagnostic_payload["learner_model"]["mastery_score"]
 
 
@@ -181,4 +181,3 @@ def test_session_creation_can_use_mocked_gemini(monkeypatch) -> None:
     payload = response.json()
     assert payload["ai"]["provider"] == "gemini"
     assert payload["diagnostic_questions"][0]["concept_id"] == "concept-1"
-

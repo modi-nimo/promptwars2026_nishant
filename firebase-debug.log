@@ -1,0 +1,50 @@
+[debug] [2026-04-25T07:34:14.008Z] ----------------------------------------------------------------------
+[debug] [2026-04-25T07:34:14.011Z] Command:       /Users/nishant.modi/.nvm/versions/node/v24.15.0/bin/node /Users/nishant.modi/.npm/_npx/147d4d3b63efa26a/node_modules/.bin/firebase projects:list --json
+[debug] [2026-04-25T07:34:14.011Z] CLI Version:   15.15.0
+[debug] [2026-04-25T07:34:14.011Z] Platform:      darwin
+[debug] [2026-04-25T07:34:14.011Z] Node Version:  v24.15.0
+[debug] [2026-04-25T07:34:14.011Z] Time:          Sat Apr 25 2026 13:04:14 GMT+0530 (India Standard Time)
+[debug] [2026-04-25T07:34:14.011Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-04-25T07:34:14.012Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
+[debug] [2026-04-25T07:34:14.027Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-04-25T07:34:14.031Z] Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at GoogleAuth.getApplicationDefaultAsync (/Users/nishant.modi/.npm/_npx/147d4d3b63efa26a/node_modules/google-auth-library/build/src/auth/googleauth.js:287:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async GoogleAuth._GoogleAuth_determineClient (/Users/nishant.modi/.npm/_npx/147d4d3b63efa26a/node_modules/google-auth-library/build/src/auth/googleauth.js:834:32)
+    at async GoogleAuth.getClient (/Users/nishant.modi/.npm/_npx/147d4d3b63efa26a/node_modules/google-auth-library/build/src/auth/googleauth.js:698:20)
+    at async GoogleAuth.getAccessToken (/Users/nishant.modi/.npm/_npx/147d4d3b63efa26a/node_modules/google-auth-library/build/src/auth/googleauth.js:722:24)
+    at async autoAuth (/Users/nishant.modi/.npm/_npx/147d4d3b63efa26a/node_modules/firebase-tools/lib/requireAuth.js:28:19)
+    at async Object.requireAuth [as fn] (/Users/nishant.modi/.npm/_npx/147d4d3b63efa26a/node_modules/firebase-tools/lib/requireAuth.js:90:20)
+    at async /Users/nishant.modi/.npm/_npx/147d4d3b63efa26a/node_modules/firebase-tools/lib/command.js:271:17
+[error] 
+[error] Error: Failed to authenticate, have you run firebase login?
+[debug] [2026-04-25T07:42:47.849Z] ----------------------------------------------------------------------
+[debug] [2026-04-25T07:42:47.851Z] Command:       /Users/nishant.modi/.nvm/versions/node/v24.15.0/bin/node /Users/nishant.modi/.npm/_npx/147d4d3b63efa26a/node_modules/.bin/firebase projects:addfirebase promptwars-nishant --non-interactive --json
+[debug] [2026-04-25T07:42:47.851Z] CLI Version:   15.15.0
+[debug] [2026-04-25T07:42:47.851Z] Platform:      darwin
+[debug] [2026-04-25T07:42:47.851Z] Node Version:  v24.15.0
+[debug] [2026-04-25T07:42:47.851Z] Time:          Sat Apr 25 2026 13:12:47 GMT+0530 (India Standard Time)
+[debug] [2026-04-25T07:42:47.851Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-04-25T07:42:47.852Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
+[debug] [2026-04-25T07:42:47.866Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-04-25T07:42:47.866Z] > authorizing via FIREBASE_TOKEN environment variable
+[warn] ⚠  Authenticating with `FIREBASE_TOKEN` is deprecated and will be removed in a future major version of `firebase-tools`. Instead, use a service account key with `GOOGLE_APPLICATION_CREDENTIALS`: https://cloud.google.com/docs/authentication/getting-started 
+[debug] [2026-04-25T07:42:47.868Z] No OAuth tokens found
+[debug] [2026-04-25T07:42:47.868Z] No OAuth tokens found
+[debug] [2026-04-25T07:42:47.868Z] > refreshing access token with scopes: []
+[debug] [2026-04-25T07:42:47.868Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-04-25T07:42:47.868Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-04-25T07:42:47.986Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 401
+[debug] [2026-04-25T07:42:47.987Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-04-25T07:42:47.987Z] >>> [apiv2][query] POST https://firebase.googleapis.com/v1beta1/projects/promptwars-nishant:addFirebase [none]
+[debug] [2026-04-25T07:42:48.197Z] <<< [apiv2][status] POST https://firebase.googleapis.com/v1beta1/projects/promptwars-nishant:addFirebase 403
+[debug] [2026-04-25T07:42:48.197Z] <<< [apiv2][body] POST https://firebase.googleapis.com/v1beta1/projects/promptwars-nishant:addFirebase {"error":{"code":403,"message":"Your application is authenticating by using local Application Default Credentials. The firebase.googleapis.com API requires a quota project, which is not set by default. To learn how to set your quota project, see https://cloud.google.com/docs/authentication/adc-troubleshooting/user-creds .","status":"PERMISSION_DENIED","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"SERVICE_DISABLED","domain":"googleapis.com","metadata":{"service":"firebase.googleapis.com","consumer":"projects/32555940559"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"Your application is authenticating by using local Application Default Credentials. The firebase.googleapis.com API requires a quota project, which is not set by default. To learn how to set your quota project, see https://cloud.google.com/docs/authentication/adc-troubleshooting/user-creds ."}]}}
+[debug] [2026-04-25T07:42:48.198Z] Request to https://firebase.googleapis.com/v1beta1/projects/promptwars-nishant:addFirebase had HTTP Error: 403, Your application is authenticating by using local Application Default Credentials. The firebase.googleapis.com API requires a quota project, which is not set by default. To learn how to set your quota project, see https://cloud.google.com/docs/authentication/adc-troubleshooting/user-creds .
+[debug] [2026-04-25T07:42:48.198Z] FirebaseError: Request to https://firebase.googleapis.com/v1beta1/projects/promptwars-nishant:addFirebase had HTTP Error: 403, Your application is authenticating by using local Application Default Credentials. The firebase.googleapis.com API requires a quota project, which is not set by default. To learn how to set your quota project, see https://cloud.google.com/docs/authentication/adc-troubleshooting/user-creds .
+    at responseToError (/Users/nishant.modi/.npm/_npx/147d4d3b63efa26a/node_modules/firebase-tools/lib/responseToError.js:53:12)
+    at RetryOperation._fn (/Users/nishant.modi/.npm/_npx/147d4d3b63efa26a/node_modules/firebase-tools/lib/apiv2.js:333:77)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[error] 
+[error] Error: Failed to add Firebase to Google Cloud Platform project. See firebase-debug.log for more info.

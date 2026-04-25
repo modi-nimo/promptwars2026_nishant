@@ -27,7 +27,7 @@ def _config(schema_model: type[BaseModel]) -> dict:
     return {
         "temperature": settings.gemini_temperature,
         "response_mime_type": "application/json",
-        "response_json_schema": schema_model.model_json_schema(),
+        "response_schema": schema_model,
     }
 
 
@@ -90,7 +90,7 @@ def generate_diagnostics(
         ensure_ascii=True,
     )
     prompt = f"""
-You are ConceptPilot, an adaptive learning assistant.
+You are ConceptMate, an adaptive learning assistant.
 Create 4 diagnostic multiple-choice questions to estimate prior knowledge.
 
 Learner input JSON:
@@ -119,7 +119,7 @@ Rules:
 
 def generate_concept_map(goal: str, level: CurrentLevel, learner_model: LearnerModel) -> tuple[list[ConceptNode], AIStatus]:
     prompt = f"""
-You are ConceptPilot.
+You are ConceptMate.
 Create a compact concept map for this learning session.
 
 Goal: {goal}
@@ -151,7 +151,7 @@ def generate_learning_card(
     adaptive_reason: str,
 ) -> tuple[LearningCard, AIStatus]:
     prompt = f"""
-You are ConceptPilot, a practical adaptive tutor.
+You are ConceptMate, a practical adaptive tutor.
 Create one short learning card.
 
 Goal: {goal}
@@ -184,7 +184,7 @@ def generate_coach(
     style: PreferredStyle,
 ) -> tuple[GeminiCoachPayload, AIStatus]:
     prompt = f"""
-You are ConceptPilot.
+You are ConceptMate.
 The learner needs adaptive coaching.
 
 Goal: {goal}
@@ -213,4 +213,3 @@ def safe_call(callable_obj, *args):
         return callable_obj(*args)
     except Exception as exc:
         return None, _fallback_status(exc)
-

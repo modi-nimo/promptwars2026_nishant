@@ -107,12 +107,12 @@ def action_after_diagnostic(learner_model: LearnerModel, concept: ConceptNode) -
 
 def reason_after_diagnostic(learner_model: LearnerModel, concept: ConceptNode, action: AdaptiveAction) -> str:
     if action == AdaptiveAction.harder_challenge:
-        return "Diagnostic answers and confidence were strong, so ConceptPilot is increasing challenge."
+        return "Diagnostic answers and confidence were strong, so ConceptMate is increasing challenge."
     if action == AdaptiveAction.prerequisite_review:
-        return f"The diagnostic exposed a gap around {concept.title}, so ConceptPilot is reviewing the prerequisite first."
+        return f"The diagnostic exposed a gap around {concept.title}, so ConceptMate is reviewing the prerequisite first."
     if action == AdaptiveAction.easier_explanation:
-        return f"The learner model marked {concept.title} as weak, so ConceptPilot is slowing down with a simpler explanation."
-    return f"The learner is ready for {concept.title}, so ConceptPilot is continuing at a steady pace."
+        return f"The learner model marked {concept.title} as weak, so ConceptMate is slowing down with a simpler explanation."
+    return f"The learner is ready for {concept.title}, so ConceptMate is continuing at a steady pace."
 
 
 def score_check(card: LearningCard, payload: CheckSubmitRequest) -> bool:
@@ -169,11 +169,11 @@ def update_after_check(
 
     if not is_correct and payload.confidence <= 2:
         action = AdaptiveAction.easier_explanation
-        reason = f"The answer was incorrect with low confidence, so ConceptPilot is simplifying {concept.title}."
+        reason = f"The answer was incorrect with low confidence, so ConceptMate is simplifying {concept.title}."
         target = concept
     elif not is_correct:
         action = AdaptiveAction.similar_practice
-        reason = f"The answer missed {concept.title}, so ConceptPilot is keeping the same concept with similar practice."
+        reason = f"The answer missed {concept.title}, so ConceptMate is keeping the same concept with similar practice."
         target = concept
     elif session.learner_model.pace == "fast":
         next_unmastered = next(
@@ -181,7 +181,7 @@ def update_after_check(
             concept,
         )
         action = AdaptiveAction.harder_challenge
-        reason = "The check was correct and mastery is trending high, so ConceptPilot is raising the challenge."
+        reason = "The check was correct and mastery is trending high, so ConceptMate is raising the challenge."
         target = next_unmastered
     else:
         next_unmastered = next(
@@ -189,8 +189,7 @@ def update_after_check(
             concept,
         )
         action = AdaptiveAction.next_concept if next_unmastered.id != concept.id else AdaptiveAction.similar_practice
-        reason = "The check was correct, so ConceptPilot is moving to the next useful step."
+        reason = "The check was correct, so ConceptMate is moving to the next useful step."
         target = next_unmastered
 
     return mastery_delta, action, reason, target
-

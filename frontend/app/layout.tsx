@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ConceptPilot",
-  description: "Adaptive learning assistant for effective concept mastery"
+  title: "ConceptMate | Adaptive AI Tutor",
+  description: "ConceptMate helps learners master any concept with Gemini-powered diagnostics, adaptive lessons, and visible progress."
 };
 
 export default function RootLayout({
