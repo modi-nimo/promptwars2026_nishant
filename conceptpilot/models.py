@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 from enum import Enum
+from typing import Annotated
 from typing import Literal
 
 from pydantic import BaseModel, Field
+
+
+SessionId = Annotated[str, Field(pattern=r"^cp_[a-f0-9]{14}$")]
 
 
 class CurrentLevel(str, Enum):
@@ -76,7 +80,7 @@ class DiagnosticAnswer(BaseModel):
 
 
 class DiagnosticSubmitRequest(BaseModel):
-    session_id: str
+    session_id: SessionId
     answers: list[DiagnosticAnswer] = Field(..., min_length=1, max_length=6)
 
 
@@ -133,7 +137,7 @@ class DiagnosticSubmitResponse(BaseModel):
 
 
 class CheckSubmitRequest(BaseModel):
-    session_id: str
+    session_id: SessionId
     card_id: str
     question_id: str
     selected_option: str = Field(..., min_length=1)
@@ -151,7 +155,7 @@ class CheckSubmitResponse(BaseModel):
 
 
 class CoachRequest(BaseModel):
-    session_id: str
+    session_id: SessionId
     message: str = Field(..., min_length=2, max_length=500)
 
 
@@ -164,7 +168,7 @@ class CoachResponse(BaseModel):
 
 
 class SessionSnapshot(BaseModel):
-    session_id: str
+    session_id: SessionId
     auth_mode: AuthMode
     owner_id: str | None = None
     goal: str

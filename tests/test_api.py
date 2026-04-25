@@ -2,7 +2,8 @@ from fastapi.testclient import TestClient
 
 import main
 from conceptpilot import gemini
-from conceptpilot.models import AIStatus, DiagnosticQuestion
+from conceptpilot.auth import UserContext, resolve_user_context
+from conceptpilot.models import AIStatus, AuthMode, DiagnosticQuestion
 from conceptpilot.repository import session_repository
 
 
@@ -11,6 +12,7 @@ client = TestClient(main.app)
 
 def setup_function() -> None:
     session_repository.clear()
+    main.app.dependency_overrides.clear()
 
 
 def _create_session(goal: str = "Learn Python async"):
@@ -53,6 +55,59 @@ def test_session_creation_uses_guest_fallback_without_gemini(monkeypatch) -> Non
     assert payload["ai"]["provider"] == "fallback"
     assert len(payload["diagnostic_questions"]) == 4
     assert payload["diagnostic_questions"][0]["answer"] in payload["diagnostic_questions"][0]["options"]
+
+
+def test_api_security_headers_are_present() -> None:
+    response = client.get("/health", headers={"x-forwarded-proto": "https"})
+
+    assert response.status_code == 200
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["referrer-policy"] == "no-referrer"
+    assert "camera=()" in response.headers["permissions-policy"]
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["strict-transport-security"].startswith("max-age=31536000")
+
+
+def test_invalid_session_create_payload_is_rejected() -> None:
+    response = client.post(
+        "/api/sessions",
+        json={
+            "goal": "AI",
+            "current_level": "Beginner",
+            "time_available_minutes": 3,
+            "preferred_style": "Examples",
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_invalid_session_id_shape_is_rejected() -> None:
+    response = client.get("/api/sessions/not-a-safe-id")
+
+    assert response.status_code == 422
+
+
+def test_signed_in_session_access_is_owner_scoped(monkeypatch) -> None:
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+    main.app.dependency_overrides[resolve_user_context] = lambda: UserContext(
+        auth_mode=AuthMode.google,
+        user_id="owner-user",
+    )
+    try:
+        session_payload = _create_session().json()
+
+        main.app.dependency_overrides[resolve_user_context] = lambda: UserContext(
+            auth_mode=AuthMode.google,
+            user_id="different-user",
+        )
+        response = client.get(f"/api/sessions/{session_payload['session_id']}")
+
+        assert response.status_code == 403
+    finally:
+        main.app.dependency_overrides.clear()
 
 
 def test_diagnostic_creates_learner_model_concept_map_and_first_card(monkeypatch) -> None:

@@ -5,7 +5,7 @@ import time
 import uuid
 from collections.abc import Callable
 
-from fastapi import Depends, FastAPI, Request, Response
+from fastapi import Depends, FastAPI, Path, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from .auth import UserContext, resolve_user_context
@@ -26,6 +26,7 @@ from .service import conceptpilot_service
 
 
 logger = logging.getLogger("conceptpilot")
+SESSION_ID_PATTERN = r"^cp_[a-f0-9]{14}$"
 
 
 def configure_logging() -> None:
@@ -72,6 +73,21 @@ async def request_logging_middleware(
     return response
 
 
+async def security_headers_middleware(
+    request: Request,
+    call_next: Callable[[Request], object],
+) -> Response:
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Cache-Control"] = "no-store"
+    if request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
+
 def create_app() -> FastAPI:
     configure_logging()
     settings = get_settings()
@@ -81,6 +97,7 @@ def create_app() -> FastAPI:
         version="1.0.0",
     )
     app.middleware("http")(request_logging_middleware)
+    app.middleware("http")(security_headers_middleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_allowed_origins,
@@ -97,7 +114,7 @@ def register_routes(app: FastAPI) -> None:
     def health() -> dict[str, str]:
         return {
             "status": "ok",
-            "service": "conceptpilot-api",
+            "service": "conceptmate-api",
             "persistence": "firestore"
             if isinstance(session_repository, FirestoreSessionRepository)
             else "memory",
@@ -113,7 +130,7 @@ def register_routes(app: FastAPI) -> None:
 
     @app.get("/api/sessions/{session_id}", response_model=SessionSnapshot)
     def read_session(
-        session_id: str,
+        session_id: str = Path(..., pattern=SESSION_ID_PATTERN),
         user: UserContext = Depends(resolve_user_context),
     ) -> SessionSnapshot:
         return conceptpilot_service.get_session(session_id, user)

@@ -125,6 +125,14 @@ export type CoachResponse = {
 const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"
 ).replace(/\/$/, "");
+const REQUEST_TIMEOUT_MS = 60000;
+
+function requestId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `web_${crypto.randomUUID()}`;
+  }
+  return `web_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
 
 async function requestJson<TResponse, TPayload = undefined>(
   path: string,
@@ -134,7 +142,12 @@ async function requestJson<TResponse, TPayload = undefined>(
     token?: string | null;
   } = {}
 ): Promise<TResponse> {
-  const headers: Record<string, string> = {};
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+    "X-Request-ID": requestId()
+  };
   if (options.payload !== undefined) {
     headers["Content-Type"] = "application/json";
   }
@@ -142,16 +155,36 @@ async function requestJson<TResponse, TPayload = undefined>(
     headers.Authorization = `Bearer ${options.token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: options.method ?? "GET",
-    headers,
-    body: options.payload === undefined ? undefined : JSON.stringify(options.payload),
-    cache: "no-store"
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      method: options.method ?? "GET",
+      headers,
+      body: options.payload === undefined ? undefined : JSON.stringify(options.payload),
+      cache: "no-store",
+      signal: controller.signal
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("ConceptMate timed out while contacting the adaptive engine. Please try again.");
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
 
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || `Request failed with ${response.status}`);
+    let message = `Request failed with ${response.status}`;
+    try {
+      const body = await response.json();
+      if (typeof body.detail === "string") {
+        message = body.detail;
+      }
+    } catch {
+      const text = await response.text();
+      if (text) message = text;
+    }
+    throw new Error(message);
   }
 
   return response.json() as Promise<TResponse>;
@@ -207,4 +240,3 @@ export function askCoach(payload: { session_id: string; message: string }, token
     token
   });
 }
-

@@ -49,6 +49,7 @@ export default function LearnSessionPage() {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [coachOpen, setCoachOpen] = useState(false);
   const [submittingDiagnostic, setSubmittingDiagnostic] = useState(false);
   const [submittingCheck, setSubmittingCheck] = useState(false);
   const [coachLoading, setCoachLoading] = useState(false);
@@ -184,12 +185,22 @@ export default function LearnSessionPage() {
               <Brain size={16} className={session.ai.provider === 'gemini' ? 'text-success' : 'text-warning'} />
               <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{session.ai.provider === 'gemini' ? "Gemini Live" : "Fallback Active"}</span>
             </div>
+            <button
+              aria-controls="ai-sidekick"
+              aria-expanded={coachOpen}
+              className="btn-secondary learn-pill"
+              onClick={() => setCoachOpen((open) => !open)}
+              type="button"
+            >
+              <Bot size={16} className="text-accent" />
+              <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{coachOpen ? "Hide Sidekick" : "AI Sidekick"}</span>
+            </button>
             {auth.user && <div className="btn-secondary learn-pill">{auth.user.displayName || "User"}</div>}
           </div>
         </div>
       </header>
 
-      <div className="learning-layout">
+      <div className={`learning-layout ${coachOpen ? "coach-open" : "coach-closed"}`}>
         {/* Sidebar Left: Progress & Map */}
         <aside className="glass-panel learn-sidebar" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', overflowY: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -369,38 +380,40 @@ export default function LearnSessionPage() {
         </section>
 
         {/* Sidebar Right: AI Coach */}
-        <aside className="glass-panel learn-coach" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Bot size={20} className="text-accent" />
-            <h3 style={{ margin: 0 }}>AI Sidekick</h3>
-          </div>
-
-          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div className="glass-panel" style={{ background: 'var(--zenith-bg)', padding: '1rem', fontSize: '0.9rem', border: '1px solid var(--zenith-border)' }}>
-              <p style={{ margin: 0, color: 'var(--zenith-text)', fontWeight: 500 }}>Hello! I'm your adaptive coach. Ask me to simplify, give more examples, or explain the "why" behind any concept.</p>
+        {coachOpen && (
+          <aside id="ai-sidekick" className="glass-panel learn-coach" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Bot size={20} className="text-accent" />
+              <h3 style={{ margin: 0 }}>AI Sidekick</h3>
             </div>
-            
-            {lastCoach && (
-              <div className="glass-panel fade-in" style={{ background: 'var(--zenith-accent-soft)', padding: '1rem', fontSize: '0.9rem', borderLeft: '3px solid var(--zenith-accent)' }}>
-                <p style={{ margin: 0, color: 'var(--zenith-text)' }}>{lastCoach.coach_response}</p>
-              </div>
-            )}
-          </div>
 
-          <div style={{ marginTop: 'auto' }}>
-            <textarea
-              value={coachMessage}
-              onChange={(e) => setCoachMessage(e.target.value)}
-              placeholder="Ask the coach..."
-              rows={3}
-              style={{ fontSize: '0.9rem', marginBottom: '1rem' }}
-            />
-            <button className="btn-primary" style={{ width: '100%' }} onClick={requestCoach} disabled={coachLoading}>
-              {coachLoading ? <Loader2 className="spin" /> : <MessageCircle size={18} />}
-              <span style={{ marginLeft: '8px' }}>Send Request</span>
-            </button>
-          </div>
-        </aside>
+            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="glass-panel" style={{ background: 'var(--zenith-bg)', padding: '1rem', fontSize: '0.9rem', border: '1px solid var(--zenith-border)' }}>
+                <p style={{ margin: 0, color: 'var(--zenith-text)', fontWeight: 500 }}>Hello! I'm your adaptive coach. Ask me to simplify, give more examples, or explain the "why" behind any concept.</p>
+              </div>
+              
+              {lastCoach && (
+                <div className="glass-panel fade-in" style={{ background: 'var(--zenith-accent-soft)', padding: '1rem', fontSize: '0.9rem', borderLeft: '3px solid var(--zenith-accent)' }}>
+                  <p style={{ margin: 0, color: 'var(--zenith-text)' }}>{lastCoach.coach_response}</p>
+                </div>
+              )}
+            </div>
+
+            <div style={{ marginTop: 'auto' }}>
+              <textarea
+                value={coachMessage}
+                onChange={(e) => setCoachMessage(e.target.value)}
+                placeholder="Ask the coach..."
+                rows={3}
+                style={{ fontSize: '0.9rem', marginBottom: '1rem' }}
+              />
+              <button className="btn-primary" style={{ width: '100%' }} onClick={requestCoach} disabled={coachLoading}>
+                {coachLoading ? <Loader2 className="spin" /> : <MessageCircle size={18} />}
+                <span style={{ marginLeft: '8px' }}>Send Request</span>
+              </button>
+            </div>
+          </aside>
+        )}
       </div>
     </main>
   );
