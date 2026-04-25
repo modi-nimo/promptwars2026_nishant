@@ -1,0 +1,12 @@
+.git
+.gitignore
+.gcloudignore
+
+.DS_Store
+.env
+.env.local
+.next/
+node_modules/
+out/
+tsconfig.tsbuildinfo
+npm-debug.log*
