@@ -4,7 +4,8 @@ This project is aligned to the hackathon criteria in `Hackathon_Guidelines.MD`.
 
 ## Code Quality
 
-- FastAPI uses Pydantic request and response models for typed API contracts.
+- FastAPI is split into focused backend modules for config, models, routes, Gemini, fallback generation, service logic, and session storage.
+- Pydantic request and response models define typed API contracts.
 - The Next.js UI keeps API payload types explicit in `frontend/app/page.tsx`.
 - Gemini responses are normalized before being stored or returned.
 - Local fallback generation keeps the demo resilient if Gemini quota is unavailable.

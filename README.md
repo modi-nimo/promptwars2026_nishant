@@ -13,6 +13,21 @@ Example-based learning companion for the PromptWars 2026 hackathon, powered by G
 
 If Gemini is not configured or the model call fails, the API falls back to a deterministic local generator so the demo still runs.
 
+## Backend Structure
+
+```text
+main.py                  Cloud Run/FastAPI entrypoint
+learnmate/api.py         FastAPI app factory and route registration
+learnmate/models.py      Pydantic request/response contracts
+learnmate/service.py     Learning, quiz, and coach business logic
+learnmate/gemini.py      Gemini prompts, structured output config, model calls
+learnmate/fallback.py    Deterministic no-key/no-quota fallback generator
+learnmate/session_store.py
+                         In-memory session persistence for the MVP
+learnmate/config.py      Environment loading and typed settings
+learnmate/utils.py       Shared text, time, and error-redaction helpers
+```
+
 ## Local Backend
 
 ```bash

@@ -1,13 +1,22 @@
 from fastapi.testclient import TestClient
 
 import main
+from learnmate import gemini
+from learnmate.models import (
+    ExampleBlock,
+    GeminiLearningPath,
+    Lesson,
+    QuizQuestion,
+    RoadmapItem,
+)
+from learnmate.session_store import session_store
 
 
 client = TestClient(main.app)
 
 
 def setup_function() -> None:
-    main.SESSIONS.clear()
+    session_store.clear()
 
 
 def test_learning_path_falls_back_without_gemini_key(monkeypatch) -> None:
@@ -33,10 +42,10 @@ def test_learning_path_falls_back_without_gemini_key(monkeypatch) -> None:
 def test_learning_path_uses_gemini_when_available(monkeypatch) -> None:
     def fake_call_gemini_json(prompt, schema_model):
         assert "Learner input JSON" in prompt
-        return main.GeminiLearningPath(
+        return GeminiLearningPath(
             topic="Cloud Run Basics",
             roadmap=[
-                main.RoadmapItem(
+                RoadmapItem(
                     id=f"map-{index}",
                     title=f"Step {index}",
                     outcome="Understand the practical idea.",
@@ -45,11 +54,11 @@ def test_learning_path_uses_gemini_when_available(monkeypatch) -> None:
                 )
                 for index in range(1, 5)
             ],
-            lesson=main.Lesson(
+            lesson=Lesson(
                 title="First Session: Cloud Run Basics",
                 objective="Understand Cloud Run with one deployment example.",
                 explanation=["Cloud Run runs containers without managing servers."],
-                example=main.ExampleBlock(
+                example=ExampleBlock(
                     title="Deploy A Small API",
                     setup="Imagine shipping a FastAPI service.",
                     walkthrough=["Build a container.", "Deploy it to Cloud Run."],
@@ -57,14 +66,14 @@ def test_learning_path_uses_gemini_when_available(monkeypatch) -> None:
                     code_sample="gcloud run deploy learnmate-api --source .",
                 ),
                 quiz=[
-                    main.QuizQuestion(
+                    QuizQuestion(
                         id="quiz-1",
                         prompt="What does Cloud Run run?",
                         options=["Containers", "Spreadsheets", "Emails", "Images only"],
                         answer="Containers",
                         focus_topic="Cloud Run mental model",
                     ),
-                    main.QuizQuestion(
+                    QuizQuestion(
                         id="quiz-2",
                         prompt="What is one benefit?",
                         options=["Managed scaling", "Manual servers", "No HTTP", "No logs"],
@@ -77,7 +86,7 @@ def test_learning_path_uses_gemini_when_available(monkeypatch) -> None:
         )
 
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
-    monkeypatch.setattr(main, "call_gemini_json", fake_call_gemini_json)
+    monkeypatch.setattr(gemini, "call_gemini_json", fake_call_gemini_json)
 
     response = client.post(
         "/api/learning-path",
