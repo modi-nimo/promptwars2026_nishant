@@ -61,12 +61,24 @@ Optional Firebase web config enables Google Sign-In. Guest sessions work without
 ## Tests
 
 ```bash
-pytest
+.venv/bin/ruff check .
+.venv/bin/python -m pytest
 npm --prefix frontend run build
 npm --prefix frontend audit --omit=dev
 ```
 
-The backend tests mock Gemini and cover guest fallback, diagnostics, adaptive checks, coach behavior, invalid flow handling, and session persistence.
+The backend tests mock Gemini and cover guest fallback, diagnostics, adaptive checks, coach behavior, invalid flow handling, signed-in owner scoping, invalid input, security headers, and session persistence.
+
+## Security And Accessibility Notes
+
+- API and frontend responses include defensive browser headers.
+- Firebase ID tokens are verified on the backend when Firebase is configured.
+- Signed-in sessions are scoped to their owner; guest sessions never trust a client-provided user id.
+- Pydantic validates request shape, lengths, enum values, confidence bounds, and session id format.
+- Gemini prompts treat learner input as untrusted and require structured JSON only.
+- The UI uses labels, fieldsets, visible focus states, accessible status text, and an opt-in AI Sidekick panel.
+
+For the judge-facing rubric map, see `EVALUATION_ALIGNMENT.md`.
 
 ## Cloud Run Backend
 
