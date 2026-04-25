@@ -1,5 +1,5 @@
 {
-  "name": "learnmate-ui",
+  "name": "conceptpilot-ui",
   "private": true,
   "version": "0.1.0",
   "scripts": {
@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "firebase": "latest",
     "lucide-react": "latest",
     "next": "latest",
     "react": "latest",

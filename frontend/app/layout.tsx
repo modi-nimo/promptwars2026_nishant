@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "LearnMate",
-  description: "Example-based learning companion"
+  title: "ConceptPilot",
+  description: "Adaptive learning assistant for effective concept mastery"
 };
 
 export default function RootLayout({

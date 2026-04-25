@@ -1,135 +1,184 @@
 from fastapi.testclient import TestClient
 
 import main
-from learnmate import gemini
-from learnmate.models import (
-    ExampleBlock,
-    GeminiLearningPath,
-    Lesson,
-    QuizQuestion,
-    RoadmapItem,
-)
-from learnmate.session_store import session_store
+from conceptpilot import gemini
+from conceptpilot.models import AIStatus, DiagnosticQuestion
+from conceptpilot.repository import session_repository
 
 
 client = TestClient(main.app)
 
 
 def setup_function() -> None:
-    session_store.clear()
+    session_repository.clear()
 
 
-def test_learning_path_falls_back_without_gemini_key(monkeypatch) -> None:
+def _create_session(goal: str = "Learn Python async"):
+    return client.post(
+        "/api/sessions",
+        json={
+            "goal": goal,
+            "current_level": "Beginner",
+            "time_available_minutes": 25,
+            "preferred_style": "Examples",
+        },
+    )
+
+
+def _submit_diagnostic(session_payload: dict, all_correct: bool = False):
+    answers = []
+    for question in session_payload["diagnostic_questions"]:
+        answers.append(
+            {
+                "question_id": question["id"],
+                "selected_option": question["answer"] if all_correct else question["options"][-1],
+                "confidence": 5 if all_correct else 2,
+            }
+        )
+
+    return client.post(
+        "/api/diagnostic/submit",
+        json={"session_id": session_payload["session_id"], "answers": answers},
+    )
+
+
+def test_session_creation_uses_guest_fallback_without_gemini(monkeypatch) -> None:
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
 
+    response = _create_session()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["auth_mode"] == "guest"
+    assert payload["ai"]["provider"] == "fallback"
+    assert len(payload["diagnostic_questions"]) == 4
+    assert payload["diagnostic_questions"][0]["answer"] in payload["diagnostic_questions"][0]["options"]
+
+
+def test_diagnostic_creates_learner_model_concept_map_and_first_card(monkeypatch) -> None:
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    session_payload = _create_session().json()
+
+    response = _submit_diagnostic(session_payload, all_correct=False)
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["learner_model"]["pace"] == "slower"
+    assert len(payload["concept_map"]) >= 3
+    assert payload["next_card"]["adaptive_action"] in {"easier_explanation", "prerequisite_review"}
+    assert payload["next_card"]["check_question"]["answer"] in payload["next_card"]["check_question"]["options"]
+
+
+def test_check_answer_updates_mastery_and_explains_adaptation(monkeypatch) -> None:
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    session_payload = _create_session().json()
+    diagnostic_payload = _submit_diagnostic(session_payload, all_correct=True).json()
+    card = diagnostic_payload["next_card"]
+
     response = client.post(
-        "/api/learning-path",
+        "/api/checks/submit",
         json={
-            "goal": "Learn Python functions",
-            "current_level": "Beginner",
-            "preferred_style": "Examples",
+            "session_id": session_payload["session_id"],
+            "card_id": card["id"],
+            "question_id": card["check_question"]["id"],
+            "selected_option": card["check_question"]["answer"],
+            "confidence": 5,
         },
     )
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["ai"]["provider"] == "fallback"
-    assert payload["ai"]["fallback_reason"].startswith("Gemini unavailable")
-    assert len(payload["roadmap"]) == 4
-    assert len(payload["lesson"]["quiz"]) == 2
+    assert payload["correctness"] == "correct"
+    assert payload["mastery_delta"] > 0
+    assert "ConceptPilot" in payload["adaptive_reason"]
+    assert payload["learner_model"]["mastery_score"] >= diagnostic_payload["learner_model"]["mastery_score"]
 
 
-def test_learning_path_uses_gemini_when_available(monkeypatch) -> None:
-    def fake_call_gemini_json(prompt, schema_model):
-        assert "Learner input JSON" in prompt
-        return GeminiLearningPath(
-            topic="Cloud Run Basics",
-            roadmap=[
-                RoadmapItem(
-                    id=f"map-{index}",
-                    title=f"Step {index}",
-                    outcome="Understand the practical idea.",
-                    checkpoint="Explain it with one example.",
-                    estimate_minutes=8,
-                )
-                for index in range(1, 5)
-            ],
-            lesson=Lesson(
-                title="First Session: Cloud Run Basics",
-                objective="Understand Cloud Run with one deployment example.",
-                explanation=["Cloud Run runs containers without managing servers."],
-                example=ExampleBlock(
-                    title="Deploy A Small API",
-                    setup="Imagine shipping a FastAPI service.",
-                    walkthrough=["Build a container.", "Deploy it to Cloud Run."],
-                    takeaway="Cloud Run handles the server layer for you.",
-                    code_sample="gcloud run deploy learnmate-api --source .",
-                ),
-                quiz=[
-                    QuizQuestion(
-                        id="quiz-1",
-                        prompt="What does Cloud Run run?",
-                        options=["Containers", "Spreadsheets", "Emails", "Images only"],
-                        answer="Containers",
-                        focus_topic="Cloud Run mental model",
-                    ),
-                    QuizQuestion(
-                        id="quiz-2",
-                        prompt="What is one benefit?",
-                        options=["Managed scaling", "Manual servers", "No HTTP", "No logs"],
-                        answer="Managed scaling",
-                        focus_topic="managed scaling",
-                    ),
-                ],
-            ),
-            next_step="Answer the quick check to test your model.",
-        )
-
-    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
-    monkeypatch.setattr(gemini, "call_gemini_json", fake_call_gemini_json)
+def test_incorrect_low_confidence_check_returns_easier_card(monkeypatch) -> None:
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    session_payload = _create_session().json()
+    diagnostic_payload = _submit_diagnostic(session_payload, all_correct=True).json()
+    card = diagnostic_payload["next_card"]
+    wrong_option = next(
+        option for option in card["check_question"]["options"] if option != card["check_question"]["answer"]
+    )
 
     response = client.post(
-        "/api/learning-path",
+        "/api/checks/submit",
         json={
-            "goal": "Learn Cloud Run deployment",
-            "current_level": "Beginner",
-            "preferred_style": "Examples",
+            "session_id": session_payload["session_id"],
+            "card_id": card["id"],
+            "question_id": card["check_question"]["id"],
+            "selected_option": wrong_option,
+            "confidence": 1,
         },
     )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["correctness"] == "incorrect"
+    assert payload["mastery_delta"] < 0
+    assert payload["next_card"]["adaptive_action"] == "easier_explanation"
+
+
+def test_coach_updates_weak_topics_and_returns_card(monkeypatch) -> None:
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    session_payload = _create_session().json()
+    _submit_diagnostic(session_payload, all_correct=True)
+
+    response = client.post(
+        "/api/coach",
+        json={
+            "session_id": session_payload["session_id"],
+            "message": "I am confused. Please make this simpler.",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["suggested_action"] == "easier_explanation"
+    assert payload["updated_weak_topics"]
+    assert payload["next_card"]["adaptive_action"] == "easier_explanation"
+
+
+def test_check_before_diagnostic_is_rejected(monkeypatch) -> None:
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    session_payload = _create_session().json()
+
+    response = client.post(
+        "/api/checks/submit",
+        json={
+            "session_id": session_payload["session_id"],
+            "card_id": "missing",
+            "question_id": "missing",
+            "selected_option": "A",
+        },
+    )
+
+    assert response.status_code == 409
+
+
+def test_session_creation_can_use_mocked_gemini(monkeypatch) -> None:
+    def fake_generate_diagnostics(goal, level, minutes, style):
+        return [
+            DiagnosticQuestion(
+                id=f"diag-{index}",
+                concept_id=f"concept-{index}",
+                prompt=f"Question {index}?",
+                options=["A", "B", "C", "D"],
+                answer="A",
+                rationale="A is the best diagnostic signal.",
+                difficulty=1,
+            )
+            for index in range(1, 5)
+        ], AIStatus(provider="gemini", model="test-gemini")
+
+    monkeypatch.setattr(gemini, "generate_diagnostics", fake_generate_diagnostics)
+
+    response = _create_session("Learn Cloud Run basics")
 
     assert response.status_code == 200
     payload = response.json()
     assert payload["ai"]["provider"] == "gemini"
-    assert payload["topic"] == "Cloud Run Basics"
-    assert payload["lesson"]["quiz"][0]["answer"] == "Containers"
+    assert payload["diagnostic_questions"][0]["concept_id"] == "concept-1"
 
-
-def test_quiz_answer_updates_progress(monkeypatch) -> None:
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-
-    learning_response = client.post(
-        "/api/learning-path",
-        json={
-            "goal": "Learn algebra",
-            "current_level": "Beginner",
-            "preferred_style": "Examples",
-        },
-    )
-    learning_payload = learning_response.json()
-    first_question = learning_payload["lesson"]["quiz"][0]
-
-    answer_response = client.post(
-        "/api/quiz/answer",
-        json={
-            "session_id": learning_payload["session_id"],
-            "question_id": first_question["id"],
-            "selected_option": first_question["answer"],
-        },
-    )
-
-    assert answer_response.status_code == 200
-    answer_payload = answer_response.json()
-    assert answer_payload["correct"] is True
-    assert answer_payload["progress"]["answered"] == 1
-    assert answer_payload["progress"]["correct"] == 1
-    assert first_question["focus_topic"] in answer_payload["progress"]["mastered_topics"]

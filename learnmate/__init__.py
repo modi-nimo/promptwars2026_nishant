@@ -1,1 +1,0 @@
-"""LearnMate backend package."""

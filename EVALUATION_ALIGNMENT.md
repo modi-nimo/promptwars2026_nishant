@@ -1,57 +1,49 @@
 # Evaluation Alignment
 
-This project is aligned to the hackathon criteria in `Hackathon_Guidelines.MD`.
+ConceptPilot is aligned to the hackathon criteria in `Hackathon_Guidelines.MD`.
 
 ## Code Quality
 
-- FastAPI is split into focused backend modules for config, models, routes, Gemini, fallback generation, service logic, and session storage.
-- Pydantic request and response models define typed API contracts.
-- The Next.js UI keeps API payload types explicit in `frontend/app/page.tsx`.
-- Gemini responses are normalized before being stored or returned.
-- Local fallback generation keeps the demo resilient if Gemini quota is unavailable.
+- FastAPI is split into focused modules for routes, models, service orchestration, adaptation logic, Gemini, fallback content, auth, and persistence.
+- Pydantic models define every request, response, Gemini payload, and stored session shape.
+- The Next.js UI keeps backend contracts typed in `frontend/lib/api.ts`.
+- Gemini calls are isolated behind a service layer and mocked in tests.
 
 ## Security
 
-- API keys are read from `.env` or Secret Manager, not hard-coded.
-- `.env` is ignored by git and Docker build context.
-- Gemini errors are redacted before being returned to the UI.
-- Learner prompts are treated as untrusted data in Gemini instructions.
-- CORS defaults to local frontend origins and can be restricted with `ALLOWED_ORIGINS`.
-- Inputs are bounded with Pydantic length and list constraints.
-- Frontend dependencies are audited with `npm audit --omit=dev`.
+- API keys are read from `.env` or Secret Manager, never hard-coded.
+- Firebase ID tokens are verified server-side when Firebase is configured.
+- Guest sessions work without trusting client-provided user ids.
+- Learner input is treated as untrusted data in Gemini prompts.
+- CORS is restricted with `ALLOWED_ORIGINS`.
+- Pydantic bounds limit goal length, answer lists, confidence, and time values.
 
 ## Efficiency
 
-- The Cloud Run backend uses a lightweight FastAPI service and calls Gemini on demand.
-- Default model is `gemini-2.5-flash` for lower latency and better quota reliability.
-- No large model or vector index is loaded in memory.
-- Cloud Run settings in `README.md` cap concurrency and max instances for cost control.
+- `gemini-2.5-flash` is the default model for latency and quota reliability.
+- Firestore is optional and the service falls back to memory locally.
+- The adaptive engine is deterministic and lightweight; no vector index is loaded.
+- Cloud Run deployment caps concurrency and max instances for cost control.
 
 ## Testing
 
-- Backend tests cover fallback mode, Gemini mode through a mocked model response, and quiz progress.
-- Tests avoid live Gemini calls so they are fast, stable, and quota-safe.
-- Run tests with:
-
-```bash
-pip install -r requirements-dev.txt
-pytest
-npm --prefix frontend audit --omit=dev
-npm --prefix frontend run build
-```
+- Backend tests cover session creation, diagnostic scoring, adaptive mastery updates, coach responses, mocked Gemini, and invalid flow handling.
+- Tests avoid live Gemini calls, so they are stable and quota-safe.
+- The frontend production build validates TypeScript and App Router pages.
 
 ## Accessibility
 
-- Goal input has a visible label.
-- Current level uses a segmented radio group with `aria-checked`.
-- Loading buttons expose `aria-busy`.
-- Learning content is announced with `aria-live`.
-- Keyboard users get visible focus states and a skip link.
-- Color is not the only state indicator; answer options also use icons and text feedback.
+- Inputs and controls use visible labels, semantic fieldsets, and focus states.
+- Status and error updates use live regions or alert roles.
+- Adaptation state is conveyed with text and icons, not color alone.
+- Layouts respond across desktop and mobile without overlapping controls.
 
 ## Google Services
 
-- Gemini API is used for roadmap, lesson, quiz, and coach generation.
-- `google-genai` is the official Gemini SDK dependency.
+- Gemini API powers diagnostics, concept maps, learning cards, and coaching.
+- Firebase Auth supports optional Google Sign-In.
+- Firestore persists sessions when `USE_FIRESTORE=true`.
 - Cloud Run deployment is documented for backend and frontend.
-- Secret Manager setup is documented for `GEMINI_API_KEY`.
+- Secret Manager stores `GEMINI_API_KEY`.
+- Cloud Logging can be enabled with `ENABLE_CLOUD_LOGGING=true`.
+
