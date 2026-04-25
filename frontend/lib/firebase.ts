@@ -11,27 +11,34 @@ import {
 } from "firebase/auth";
 import { useEffect, useState } from "react";
 
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
-};
+import { getRuntimeConfig } from "./runtime-config";
+
+function firebaseConfig() {
+  const runtimeConfig = getRuntimeConfig().firebase ?? {};
+  return {
+    apiKey: runtimeConfig.apiKey ?? process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+    authDomain: runtimeConfig.authDomain ?? process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    projectId: runtimeConfig.projectId ?? process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    appId: runtimeConfig.appId ?? process.env.NEXT_PUBLIC_FIREBASE_APP_ID
+  };
+}
 
 export function firebaseConfigured() {
+  const config = firebaseConfig();
   return Boolean(
-    firebaseConfig.apiKey &&
-      firebaseConfig.authDomain &&
-      firebaseConfig.projectId &&
-      firebaseConfig.appId
+    config.apiKey &&
+      config.authDomain &&
+      config.projectId &&
+      config.appId
   );
 }
 
 function app(): FirebaseApp | null {
-  if (!firebaseConfigured()) {
+  const config = firebaseConfig();
+  if (!(config.apiKey && config.authDomain && config.projectId && config.appId)) {
     return null;
   }
-  return getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+  return getApps().length ? getApps()[0] : initializeApp(config);
 }
 
 export function useFirebaseUser() {

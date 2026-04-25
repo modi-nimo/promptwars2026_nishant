@@ -1,3 +1,5 @@
+import { getRuntimeConfig } from "./runtime-config";
+
 export type CurrentLevel = "Beginner" | "Intermediate" | "Advanced";
 export type PreferredStyle = "Examples" | "Visual" | "Socratic" | "Hands-on";
 export type AuthMode = "guest" | "google";
@@ -122,8 +124,15 @@ export type CoachResponse = {
   ai: AIStatus;
 };
 
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
 const REQUEST_TIMEOUT_MS = 60000;
+
+function apiBaseUrl() {
+  return (
+    getRuntimeConfig().apiBaseUrl ??
+    process.env.NEXT_PUBLIC_API_BASE_URL ??
+    ""
+  ).replace(/\/$/, "");
+}
 
 function requestId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -155,7 +164,7 @@ async function requestJson<TResponse, TPayload = undefined>(
 
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
+    response = await fetch(`${apiBaseUrl()}${path}`, {
       method: options.method ?? "GET",
       headers,
       body: options.payload === undefined ? undefined : JSON.stringify(options.payload),
