@@ -80,6 +80,8 @@ The backend tests mock Gemini and cover guest fallback, diagnostics, adaptive ch
 
 For the judge-facing rubric map, see `EVALUATION_ALIGNMENT.md`.
 
+For the jury demo script, live pitch flow, punchlines, and Q&A prep, see `PITCH_README.md`.
+
 ## Cloud Run Backend
 
 Create the Gemini secret:
