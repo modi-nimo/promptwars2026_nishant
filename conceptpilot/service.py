@@ -17,6 +17,7 @@ from .models import (
     SessionCreateRequest,
     SessionCreateResponse,
     SessionSnapshot,
+    SessionSummaryResponse,
 )
 from .repository import SessionRepository, session_repository
 from .utils import utc_now
@@ -117,6 +118,7 @@ class ConceptPilotService:
         session.concept_map = concepts
         session.current_card = card
         session.ai = card_ai if card_ai.provider == "gemini" else map_ai
+        session.initial_mastery_score = learner_model.mastery_score
         session.updated_at = utc_now()
         session.attempts.append(
             {
@@ -248,6 +250,38 @@ class ConceptPilotService:
             updated_weak_topics=session.learner_model.weak_topics,
             next_card=session.current_card if next_card else None,
             ai=ai,
+        )
+
+    def get_session_summary(self, session_id: str, user: UserContext) -> SessionSummaryResponse:
+        session = self.get_session(session_id, user)
+        if not session.learner_model:
+            raise HTTPException(status_code=409, detail="Complete the diagnostic before viewing summary")
+
+        total_attempts = len(session.attempts)
+        diagnostic_attempts = sum(1 for attempt in session.attempts if attempt.get("type") == "diagnostic")
+        check_attempts = sum(1 for attempt in session.attempts if attempt.get("type") == "check")
+        coach_attempts = sum(1 for attempt in session.attempts if attempt.get("type") == "coach")
+        correct_checks = sum(1 for attempt in session.attempts if attempt.get("type") == "check" and attempt.get("correct") is True)
+        incorrect_checks = sum(1 for attempt in session.attempts if attempt.get("type") == "check" and attempt.get("correct") is False)
+
+        initial_mastery = session.initial_mastery_score if session.initial_mastery_score is not None else 0.0
+        current_mastery = session.learner_model.mastery_score
+        mastery_gained = round(current_mastery - initial_mastery, 2)
+
+        return SessionSummaryResponse(
+            session_id=session.session_id,
+            goal=session.goal,
+            created_at=session.created_at,
+            updated_at=session.updated_at,
+            total_attempts=total_attempts,
+            diagnostic_attempts=diagnostic_attempts,
+            check_attempts=check_attempts,
+            coach_attempts=coach_attempts,
+            correct_checks=correct_checks,
+            incorrect_checks=incorrect_checks,
+            initial_mastery_score=initial_mastery,
+            current_mastery_score=current_mastery,
+            mastery_points_gained=mastery_gained,
         )
 
 

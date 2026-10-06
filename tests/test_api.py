@@ -236,3 +236,81 @@ def test_session_creation_can_use_mocked_gemini(monkeypatch) -> None:
     payload = response.json()
     assert payload["ai"]["provider"] == "gemini"
     assert payload["diagnostic_questions"][0]["concept_id"] == "concept-1"
+
+
+def test_session_summary_before_diagnostic_is_rejected(monkeypatch) -> None:
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    session_payload = _create_session().json()
+
+    response = client.get(f"/api/sessions/{session_payload['session_id']}/summary")
+
+    assert response.status_code == 409
+
+
+def test_session_summary_shows_progress_after_diagnostic(monkeypatch) -> None:
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    session_payload = _create_session().json()
+    _submit_diagnostic(session_payload, all_correct=True)
+
+    response = client.get(f"/api/sessions/{session_payload['session_id']}/summary")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["session_id"] == session_payload["session_id"]
+    assert payload["total_attempts"] == 1
+    assert payload["diagnostic_attempts"] == 1
+    assert payload["check_attempts"] == 0
+    assert payload["coach_attempts"] == 0
+    assert payload["initial_mastery_score"] >= 0.0
+    assert payload["current_mastery_score"] >= 0.0
+    assert payload["mastery_points_gained"] == 0.0
+
+
+def test_session_summary_tracks_mastery_gain_after_checks(monkeypatch) -> None:
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    session_payload = _create_session().json()
+    diagnostic_payload = _submit_diagnostic(session_payload, all_correct=True).json()
+    card = diagnostic_payload["next_card"]
+
+    client.post(
+        "/api/checks/submit",
+        json={
+            "session_id": session_payload["session_id"],
+            "card_id": card["id"],
+            "question_id": card["check_question"]["id"],
+            "selected_option": card["check_question"]["answer"],
+            "confidence": 5,
+        },
+    )
+
+    response = client.get(f"/api/sessions/{session_payload['session_id']}/summary")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total_attempts"] == 2
+    assert payload["diagnostic_attempts"] == 1
+    assert payload["check_attempts"] == 1
+    assert payload["correct_checks"] == 1
+    assert payload["incorrect_checks"] == 0
+    assert payload["mastery_points_gained"] > 0.0
+
+
+def test_session_summary_counts_coach_interactions(monkeypatch) -> None:
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    session_payload = _create_session().json()
+    _submit_diagnostic(session_payload, all_correct=True)
+
+    client.post(
+        "/api/coach",
+        json={
+            "session_id": session_payload["session_id"],
+            "message": "Help me understand this better.",
+        },
+    )
+
+    response = client.get(f"/api/sessions/{session_payload['session_id']}/summary")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total_attempts"] == 2
+    assert payload["coach_attempts"] == 1

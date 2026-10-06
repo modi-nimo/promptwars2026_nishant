@@ -20,6 +20,7 @@ from .models import (
     SessionCreateRequest,
     SessionCreateResponse,
     SessionSnapshot,
+    SessionSummaryResponse,
 )
 from .repository import FirestoreSessionRepository, session_repository
 from .service import conceptpilot_service
@@ -155,3 +156,10 @@ def register_routes(app: FastAPI) -> None:
         user: UserContext = Depends(resolve_user_context),
     ) -> CoachResponse:
         return conceptpilot_service.coach(payload, user)
+
+    @app.get("/api/sessions/{session_id}/summary", response_model=SessionSummaryResponse)
+    def get_session_summary(
+        session_id: str = Path(..., pattern=SESSION_ID_PATTERN),
+        user: UserContext = Depends(resolve_user_context),
+    ) -> SessionSummaryResponse:
+        return conceptpilot_service.get_session_summary(session_id, user)

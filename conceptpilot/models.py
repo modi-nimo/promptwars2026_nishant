@@ -183,6 +183,7 @@ class SessionSnapshot(BaseModel):
     current_card: LearningCard | None = None
     attempts: list[dict] = Field(default_factory=list)
     ai: AIStatus
+    initial_mastery_score: float | None = None
 
 
 class ConceptMapPayload(BaseModel):
@@ -201,3 +202,19 @@ class GeminiCoachPayload(BaseModel):
 
 class GeminiDiagnosticPayload(BaseModel):
     questions: list[DiagnosticQuestion] = Field(..., min_length=4, max_length=6)
+
+
+class SessionSummaryResponse(BaseModel):
+    session_id: str
+    goal: str
+    created_at: str
+    updated_at: str
+    total_attempts: int
+    diagnostic_attempts: int
+    check_attempts: int
+    coach_attempts: int
+    correct_checks: int
+    incorrect_checks: int
+    initial_mastery_score: float
+    current_mastery_score: float
+    mastery_points_gained: float
